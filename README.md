@@ -5,4 +5,4 @@ This project is a altered and edited version of the example provided at RoboDK's
 
 The RoboDK C++ API files can also be found in the link above, should you have any questions regarding API specific funtions.
 
-See files: mainwindow.cpp and duplobrick.h for the core work behind this project.
+See files: mainwindow.cpp (line 197 - 986) and duplobrick.h for the core work behind this project.
