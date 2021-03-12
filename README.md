@@ -3,4 +3,6 @@ This is a hobby project which is a newer, simplified and altered version of what
 
 This project is a altered and edited version of the example provided at RoboDK's C++ API github page which can be found at: https://github.com/RoboDK/RoboDK-API/tree/master/C++/Example
 
+The RoboDK C++ API files can also be found in the link above, should you have any questions regarding API specific funtions.
+
 See files: mainwindow.cpp and duplobrick.h for the core work regarding this project.
