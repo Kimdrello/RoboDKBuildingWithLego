@@ -8,7 +8,6 @@
 
 using namespace std;
 
-//Priority 0 - Empty Brick, Priority 1 - Support Brick, Priority 2 - Bricks with 80% or more stud support.
 class DuploBrick{
     private:
         int xCoord;        
