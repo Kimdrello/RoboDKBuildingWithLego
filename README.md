@@ -5,4 +5,9 @@ This project is a altered and edited version of the example provided at RoboDK's
 
 The RoboDK C++ API files can also be found in the link above, should you have any questions regarding API specific funtions.
 
-See files: mainwindow.cpp (line 197 - 986) and duplobrick.h for the core work behind this project.
+See files: mainwindow.cpp (line 242 - 1074) and duplobrick.h for the core work behind this project.
+
+TODO:
+ - Add a better way to assign color to each brick.
+ - Find a better way to assign priority to each brick (Machine Learning).
+ - Add more brick types (2x1 and 4x1).
