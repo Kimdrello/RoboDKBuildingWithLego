@@ -8,6 +8,7 @@ The RoboDK C++ API files can also be found in the link above, should you have an
 See files: mainwindow.cpp (line 242 - 1074) and duplobrick.h for the core work behind this project.
 
 3DBenchyBuiltBetter.PNG shows a finished structure built by the robot.
+
 coloredBricksRoboDK.PNG shows the robot in the process of building a beach ball with colored bricks.
 
 TODO:
