@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>915</width>
-    <height>556</height>
+    <height>579</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -250,6 +250,13 @@ Position</string>
              </layout>
             </item>
             <item>
+             <widget class="QRadioButton" name="radIncludeSBrick">
+              <property name="text">
+               <string>Include Support Bricks</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="load3DModelbtn">
               <property name="text">
                <string>Load 3D Model</string>
@@ -269,6 +276,9 @@ Position</string>
             </item>
             <item>
              <widget class="QPushButton" name="btnThingMLRun">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
               <property name="text">
                <string>Run ThingML</string>
               </property>
@@ -323,6 +333,9 @@ Position</string>
            </item>
            <item>
             <widget class="QPushButton" name="dropBrickbtn">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
              <property name="text">
               <string>Drop Brick</string>
              </property>
@@ -330,6 +343,9 @@ Position</string>
            </item>
            <item>
             <widget class="QPushButton" name="humanInterferencebtn">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
              <property name="text">
               <string>Human Interference</string>
              </property>
@@ -337,6 +353,9 @@ Position</string>
            </item>
            <item>
             <widget class="QPushButton" name="emergencyStopbtn">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
              <property name="text">
               <string>Emergency Stop</string>
              </property>
@@ -344,22 +363,11 @@ Position</string>
            </item>
            <item>
             <widget class="QPushButton" name="releaseEmergenyStopbtn">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
              <property name="text">
               <string>Release Emergency Stop</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="btnOneCoordOneBrick">
-             <property name="text">
-              <string>One Coord One Brick</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="btnOneCoordOneStud">
-             <property name="text">
-              <string>One Coord One Stud</string>
              </property>
             </widget>
            </item>

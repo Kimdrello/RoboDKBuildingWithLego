@@ -39,31 +39,34 @@ public:
     /// Apply an incremental movement
     void IncrementalMove(int id, double sense);
 
-    list<Item> pickUpBrick_and_Move(RoboDK *rdk, Item *robot, Item *parent_frame, Item *work_frame, Item *tool, list<Item> dispenser, DuploBrick *brick);
+    list<Item> Build_And_Update_Dispenser(RoboDK *rdk, Item *robot, Item *parent_frame, Item *work_frame, Item *tool, list<Item> dispenser, DuploBrick *brick);
 
-    int CheckIfPlaceable(int studsXdir, int studsYdir, bool arr[50][50][50], int x, int y, int z);
+    int Check_If_Placeable(int studsXdir, int studsYdir, bool arr[50][50][50], int x, int y, int z);
 
-    list<Item> fillDispenser(DuploBrick *brick, double RGB[4]);
+    list<Item> Fill_Dispenser(DuploBrick *brick, double RGB[4], int missingBricks);
 
-    void UpdateDispenser(list<Item> dispenser, QString brickName);
+    void Update_Dispenser(list<Item> dispenser, DuploBrick *brick);
 
-    bool checkIfdispenserIsEmpty(Item *robot);
+    bool Check_If_Dispenser_Is_Empty(Item *robot);
 
-    void setUpUIGrid();
+    void Set_Up_UI_Grid();
 
     void blocking_task();
 
-    void EmergencyTriggered();
+    void Emergency_Triggered();
 
-    void BuildStructure();
+    void Run_Build();
 
-    void AddSupportBricks(DuploBrick *brick, int x, int y, int z);
+    void Add_And_Sort_Bricklist_Content();
+
+    void Add_Support_Bricks(DuploBrick *brick, int x, int y, int z);
 
     bool ListComparison(DuploBrick first, DuploBrick second);
 
     void PlaceHolderFunctionScenario4();
 
     bool EventsLoop();
+
     bool SampleRoboDkEvent(int evt, Item itm);
 private slots:
     void on_btnLoadFile_clicked();
@@ -94,9 +97,6 @@ private slots:
     void on_humanInterferencebtn_clicked();
     void on_emergencyStopbtn_clicked();
     void on_releaseEmergenyStopbtn_clicked();
-
-    void on_btnOneCoordOneBrick_clicked();
-    void on_btnOneCoordOneStud_clicked();
 
     void on_btnAddLayer_clicked();
     void on_load3DModelbtn_clicked();

@@ -34,17 +34,62 @@ public:
     int yID;
 };
 
-// Coord Grid for Scenarios
+//Class for asigning a color for each coordinate. Only used when reading a text file containing the coordinates and colors of a voxelized 3d model.
+class CoordColor{
+
+struct Color{
+    double RGBColor[4];
+};
+
+private:
+    Color color;
+    int x;
+    int y;
+    int z;
+
+public:
+    CoordColor(int xCoord, int yCoord, int zCoord, double colorR, double colorG, double colorB){
+        x = xCoord;
+        y = yCoord;
+        z = zCoord;
+
+        color.RGBColor[0] = colorR;
+        color.RGBColor[1] = colorG;
+        color.RGBColor[2] = colorB;
+        color.RGBColor[3] = 1.0;
+    }
+
+
+    double* Color(){
+        return color.RGBColor;
+    }
+
+    int X(){
+        return x;
+    }
+
+    int Y(){
+        return y;
+    }
+
+    int Z(){
+        return z;
+    }
+};
+
+//Global variables
+//Coord Grid for Scenarios
 bool buildCoords[50][50][50];
 bool supportCoords[50][50][50];
 bool running;
 std::thread *mainThread;
-QFuture<void> updateDispenserThread;
+QFuture<void> Update_DispenserThread;
 
 list<Item> TwoByTwoBlockDispenser;
 list<Item> TwoByFourBlockDispenser;
 list<Item> OneByOneBlockDispenser;
 list<DuploBrick> bricklist;
+list<CoordColor> colorList;
 
 list<DuploBrick> supportbricklist;
 bool EmergencyStopTriggered;
@@ -74,7 +119,7 @@ MainWindow::MainWindow(QWidget *parent) :
     adjustSize();
 
     //Own edit. The UI grid for creating patterns are generated when the UI is created.
-    setUpUIGrid();
+    Set_Up_UI_Grid();
 
     // Start RoboDK API here (RoboDK will start if it is not running)
     ROBOT = NULL;
@@ -200,7 +245,7 @@ void MainWindow::on_btnMovePose_clicked(){
  * where the user can toggle the buttons to create a pattern which
  * the robot will build.
  */
-void MainWindow::setUpUIGrid(){
+void MainWindow::Set_Up_UI_Grid(){
     grid1 = new QGridLayout;
     qbox = new QGroupBox;
     QString msg;
@@ -247,87 +292,74 @@ bool MainWindow::ListComparison(DuploBrick first, DuploBrick second){
 }
 
 /**
- * @brief MainWindow::on_btnOneCoordOneBrick_clicked
+ * @brief Add_And_Sort_Bricklist_Content
  *
- * When clicked, each coordinate is treated according to a 2x2 brick.
- * This is currently not in use.
- *
- */
-void MainWindow::on_btnOneCoordOneBrick_clicked(){
-
-}
-
-/**
- * @brief MainWindow::on_btnOneCoordOneStud_clicked
- *
- * When clicked, each coordinate is treated according to the studs of
+ * Each coordinate is treated according to the studs of
  * each brick and the base plate.
  *
  * The algorithm counts the studs of each layer which in this case
  * is represented by a bool value = true in the buildCoords array.
  * The algorithm will always try to place a 2x4 brick first, then
  * 2x2, and then 1x1 if none of the other bricks can be placed. It
- * will also check if a 2x4 brick can indeed be place by rotating
- * it 90 degrees.
+ * will also check if a 2x4 brick can be place by rotating
+ * it 90 degrees. A color may be assigned to each brick too by
+ * checking a list containing colors assigned for each coordinate.
+ * Contents are only added to this list when loading a 3D model,
+ * see function on_load3DModelbtn_clicked.
  *
- * To avoid floating bricks, the function AddSupportBricks is
+ * To avoid floating bricks, the function Add_Support_Bricks can be
  * ran concurrently after the algorithm has checked what brick
  * to place at the current coordinates.
  *
  */
-void MainWindow::on_btnOneCoordOneStud_clicked(){
-    QFuture<void> addSupportBricksThread;
+
+void MainWindow::Add_And_Sort_Bricklist_Content(){
+    QFuture<void> add_Support_Bricks_Thread;
 
     if(bricklist.empty()){
-
-        cout << "Function: on_btnOneCoordOneStud_clicked, Message: Loaded: One Coord One Stud" << endl;
 
         for(int z = 0; z < 50; z++){
             for(int x = 0; x < 50; x++){
                 for(int y = 0; y < 50; y++){
                     if(buildCoords[z][x][y]){
-                        Brick2x2 *temp2x2 = new Brick2x2(x, y, z, false);
-                        Brick2x4 *temp2x4 = new Brick2x4(x, y, z, false);
-                        Brick1x1 *temp1x1 = new Brick1x1(x, y, z, false);
+                        Brick2x2 *temp2x2 = new Brick2x2(x, y, z);
+                        Brick2x4 *temp2x4 = new Brick2x4(x, y, z);
+                        Brick1x1 *temp1x1 = new Brick1x1(x, y, z);
 
-                        DuploBrick *brick = new DuploBrick(x, y, z, false);
-                        DuploBrick *supportBrick = new DuploBrick(x, y, z, false);
+                        DuploBrick *brick = new DuploBrick(x, y, z);
+                        DuploBrick *supportBrick = new DuploBrick(x, y, z);
 
-                        bool canPlace2x2 = (CheckIfPlaceable(temp2x2->StudsXDir(), temp2x2->StudsYDir(), buildCoords, x, y, z) == 4);
-                        bool canPlace2x4 = (CheckIfPlaceable(temp2x4->StudsXDir(), temp2x4->StudsYDir(), buildCoords, x, y, z) == 8);
+                        bool canPlace2x2 = (Check_If_Placeable(temp2x2->StudsXDir(), temp2x2->StudsYDir(), buildCoords, x, y, z) == 4);
+                        bool canPlace2x4 = (Check_If_Placeable(temp2x4->StudsXDir(), temp2x4->StudsYDir(), buildCoords, x, y, z) == 8);
+                        bool fullSupport;
 
                         if(!canPlace2x4){
                             temp2x4->SetRotation(90);
                             cout << "Function: on_btnOneCoordOneStud_clicked, Message: Trying to rotate brick." << endl;
-                            canPlace2x4 = (CheckIfPlaceable(temp2x4->StudsXDir(), temp2x4->StudsYDir(), buildCoords, x, y, z) == 8);
+                            canPlace2x4 = (Check_If_Placeable(temp2x4->StudsXDir(), temp2x4->StudsYDir(), buildCoords, x, y, z) == 8);
                         }      
 
                         if(canPlace2x4){
                             brick = temp2x4;
 
-                            Brick2x4 *support2x4 = new Brick2x4(x, y, z, false);
+                            Brick2x4 *support2x4 = new Brick2x4(x, y, z);
                             support2x4->SetRotation(temp2x4->Rotation());
-                            supportBrick = support2x4;
+                            supportBrick = support2x4;                           
                             cout << "Function: on_btnOneCoordOneStud_clicked, Message: Adding 2x4 Brick to list." << endl;
                         }
                         else if(canPlace2x2){
                             brick = temp2x2;
 
-                            Brick2x2 *support2x2 = new Brick2x2(x, y, z, false);
+                            Brick2x2 *support2x2 = new Brick2x2(x, y, z);
                             supportBrick = support2x2;
                             cout << "Function: on_btnOneCoordOneStud_clicked, Message: Adding 2x2 Brick to list." << endl;
                         }
                         else{
                             brick = temp1x1;
 
-                            Brick1x1 *support1x1 = new Brick1x1(x, y, z, false);
+                            Brick1x1 *support1x1 = new Brick1x1(x, y, z);
                             supportBrick = support1x1;
                             cout << "Function: on_btnOneCoordOneStud_clicked, Message: Adding 1x1 Brick to list." << endl;
-                        }
-
-                        if(z > 0){
-                            addSupportBricksThread = QtConcurrent::run(this, &MainWindow::AddSupportBricks, supportBrick, x, y, z);
-                            brick->SetSupport();
                         }
 
                         for(int i = 0; i < brick->StudsXDir(); i++){
@@ -337,8 +369,25 @@ void MainWindow::on_btnOneCoordOneStud_clicked(){
                             }
                         }
 
-                        if(addSupportBricksThread.isRunning()){
-                            addSupportBricksThread.waitForFinished();
+                        if(z > 0 && ui->radIncludeSBrick->isChecked()){
+                            add_Support_Bricks_Thread = QtConcurrent::run(this, &MainWindow::Add_Support_Bricks, supportBrick, x, y, z);
+                            fullSupport = (Check_If_Placeable(brick->StudsXDir(), brick->StudsYDir(), supportCoords, x, y, z - 1) == brick->StudsXDir() * brick->StudsYDir());
+                            if(fullSupport){
+                                brick->SetPriority(2);
+                            }else{
+                                brick->SetPriority(1);
+                            }
+                            brick->SetSupport();
+                        }
+
+                        list<CoordColor>::iterator it;
+
+                        for (it = colorList.begin(); it != colorList.end(); it++){
+                            if(it->X() == x && it->Y() == y && it->Z() == z) brick->SetColor(it->Color());
+                        }
+
+                        if(add_Support_Bricks_Thread.isRunning()){
+                            add_Support_Bricks_Thread.waitForFinished();
                         }
 
                         bricklist.push_back(*brick);
@@ -353,7 +402,7 @@ void MainWindow::on_btnOneCoordOneStud_clicked(){
 }
 
 /**
- * @brief MainWindow::AddSupportBricks
+ * @brief MainWindow::Add_Support_Bricks
  *
  * If the current layer is > 0, this function will check the previous layers to see
  * if there are studs in which a brick can be placed upon. This is to avoid
@@ -366,17 +415,17 @@ void MainWindow::on_btnOneCoordOneStud_clicked(){
  * @param y is the y coordinate of the brick
  * @param z is the z coordinate of the brick
  */
-void MainWindow::AddSupportBricks(DuploBrick *brick, int x, int y, int z){
-    int countStudsForChildLayer = CheckIfPlaceable(brick->StudsXDir(), brick->StudsYDir(), supportCoords, x, y, z - 1);
-    cout << "Function: AddSupportBricks, Message: Studs in Childlayer: " << countStudsForChildLayer << endl;
+void MainWindow::Add_Support_Bricks(DuploBrick *brick, int x, int y, int z){
+    int countStudsForChildLayer = Check_If_Placeable(brick->StudsXDir(), brick->StudsYDir(), supportCoords, x, y, z - 1);
+    cout << "Function: Add_Support_Bricks, Message: Studs in Childlayer: " << countStudsForChildLayer << endl;
     if(countStudsForChildLayer == 0){
         int childLayerCounter = 1;
         while(childLayerCounter <= z){
-            cout << "Function: AddSupportBricks, Message: Inside support whileloop" << endl;
-            int countStudsForChildLayers = CheckIfPlaceable(brick->StudsXDir(), brick->StudsYDir(), supportCoords, x, y, childLayerCounter - 1);
+            cout << "Function: Add_Support_Bricks, Message: Inside support whileloop" << endl;
+            int countStudsForChildLayers = Check_If_Placeable(brick->StudsXDir(), brick->StudsYDir(), supportCoords, x, y, childLayerCounter - 1);
 
             if(countStudsForChildLayers == 0 /*|| countStudsForChildLayers >= maxSupport*/){
-                DuploBrick *supportBlock = new DuploBrick(0, 0, 0, false);
+                DuploBrick *supportBlock = new DuploBrick(0, 0, 0);
                 supportBlock = brick;
                 supportBlock->SetPriority(3, childLayerCounter - 1);
 
@@ -385,8 +434,8 @@ void MainWindow::AddSupportBricks(DuploBrick *brick, int x, int y, int z){
                         supportCoords[childLayerCounter - 1][x+i][y+j] = true;
                     }
                 }
-                cout << "Function: AddSupportBricks, Message: Support brick type: " << supportBlock->Name().toStdString() << endl;
-                cout << "Function: AddSupportBricks, Message: Support brick prio: " << supportBlock->Priority() << endl;
+                cout << "Function: Add_Support_Bricks, Message: Support brick type: " << supportBlock->Name().toStdString() << endl;
+                cout << "Function: Add_Support_Bricks, Message: Support brick prio: " << supportBlock->Priority() << endl;
                 supportbricklist.push_back(*supportBlock);
             }
             childLayerCounter++;
@@ -398,7 +447,7 @@ void MainWindow::AddSupportBricks(DuploBrick *brick, int x, int y, int z){
  * @brief MainWindow::on_btnProgRun_clicked
  *
  * When clicked it will start a new thread. At the start of the thread,
- * the function BuildStructure is called.
+ * the function Run_Build is called.
  *
  * Before the thread is initiated, the application will first check
  * if a robot is active in the simulation. Then it will check if
@@ -408,16 +457,13 @@ void MainWindow::AddSupportBricks(DuploBrick *brick, int x, int y, int z){
 void MainWindow::on_btnProgRun_clicked(){
     if (!Check_Robot()){ return; }
 
+    //Fill_All_Dispensers();
     if(bricklist.empty()){
-        cout << "Function: on_btnProgRun_clicked, Message: List is empty!" << endl;
-        return;
+        cout << "Function: on_btnProgRun_clicked, Message: BrickList(s) empty, adding contents." << endl;
+        Add_And_Sort_Bricklist_Content();
     }
 
-    //*************************Direct method*******************************************************************
-
-    mainThread = new std::thread(&MainWindow::BuildStructure, this);
-
-    //*********************************************************************************************************
+    mainThread = new std::thread(&MainWindow::Run_Build, this);
 }
 
 /**
@@ -453,7 +499,7 @@ void MainWindow::on_btnThingMLRun_clicked(){
 }
 
 /**
- * @brief MainWindow::BuildStructure
+ * @brief MainWindow::Run_Build
  *
  * The main function that handles the building process. When we a run a new thread in
  * RoboDK we have to initalize a new instance of RoboDK which is done at the start
@@ -461,21 +507,22 @@ void MainWindow::on_btnThingMLRun_clicked(){
  * this function we also need to set a global RoboDK and Item (Robot) variable to
  * point to the instance and robot ran inside this function.
  *
- * BuildStructure uses an iterator to go through the brick list and each dispenser
- * is updated when the function pickUpBrick_and_Move is called which is the process
+ * Run_Build uses an iterator to go through the brick list and each dispenser
+ * is updated when the function Build_And_Update_Dispenser_List is called which is the process
  * of the robot moving over to a dispenser, picking out a brick and then placing it
  * at its correct spot.
  *
  */
-void MainWindow::BuildStructure(){
+void MainWindow::Run_Build(){
     clock_t start;
     double duration;
 
     start = clock();
 
-    cout << "Function: BuildStructure, Message: Build initialized" << endl;
+    cout << "Function: Run_Build, Message: Build initialized" << endl;
     RoboDK *rdk = new RoboDK;
     RDK = rdk;
+
     Item *robot = new Item(rdk->getItem("UR10", RoboDK::ITEM_TYPE_ROBOT));
     ROBOT = robot;
 
@@ -496,13 +543,13 @@ void MainWindow::BuildStructure(){
     list<DuploBrick>::iterator it;
 
     for (it = bricklist.begin(); it != bricklist.end(); it++){
-        if(checkIfdispenserIsEmpty(robot) || EmergencyStopTriggered) break;
+        if(Check_If_Dispenser_Is_Empty(robot) || EmergencyStopTriggered) break;
 
         ui->statusBar->showMessage("Dispenser status ok.");
 
         if(it->Priority() > 0){
 
-            cout << "Function: BuildStructure, Message: The priority of next brick is: " << it->Priority() << endl;
+            cout << "Function: Run_Build, Message: The priority of next brick is: " << it->Priority() << endl;
 
             if(it->Name() == "duplo_brick_2x2"){
                 Brick2x2 *temp2x2 = new Brick2x2(it->X(), it->Y(), it->Z(), it->RequiredSupport());
@@ -510,10 +557,13 @@ void MainWindow::BuildStructure(){
                 if(it->Priority() == 3){
                     TwoByTwoBlockDispenser.front().setName("Support brick");
                     TwoByTwoBlockDispenser.front().setColor(rgbColor);
-                }               
-                cout << "Function: BuildStructure, Message: The brick type is 2x2." << endl;
+                }
+                else{
+                    TwoByTwoBlockDispenser.front().setColor(it->Color());
+                }
+                cout << "Function: Run_Build, Message: The brick type is 2x2." << endl;
 
-                TwoByTwoBlockDispenser = pickUpBrick_and_Move(rdk, robot, table_frame, work_frame, tool, TwoByTwoBlockDispenser, temp2x2);
+                TwoByTwoBlockDispenser = Build_And_Update_Dispenser(rdk, robot, table_frame, work_frame, tool, TwoByTwoBlockDispenser, temp2x2);
             }
             else if(it->Name() == "duplo_brick_2x4"){
 
@@ -523,10 +573,13 @@ void MainWindow::BuildStructure(){
                 if(it->Priority() == 3){
                     TwoByFourBlockDispenser.front().setName("Support brick");
                     TwoByFourBlockDispenser.front().setColor(rgbColor);
-                }                
-                cout << "Function: BuildStructure, Message: The brick type is 2x4." << endl;
+                }
+                else{
+                    TwoByFourBlockDispenser.front().setColor(it->Color());
+                }
+                cout << "Function: Run_Build, Message: The brick type is 2x4." << endl;
 
-                TwoByFourBlockDispenser = pickUpBrick_and_Move(rdk, robot, table_frame, work_frame, tool, TwoByFourBlockDispenser, temp2x4);
+                TwoByFourBlockDispenser = Build_And_Update_Dispenser(rdk, robot, table_frame, work_frame, tool, TwoByFourBlockDispenser, temp2x4);
             }
             else if(it->Name() == "duplo_brick_1x1"){
                 Brick1x1 *temp1x1 = new Brick1x1(it->X(), it->Y(), it->Z(), it->RequiredSupport());
@@ -534,10 +587,14 @@ void MainWindow::BuildStructure(){
                 if(it->Priority() == 3){
                     OneByOneBlockDispenser.front().setName("Support brick");
                     OneByOneBlockDispenser.front().setColor(rgbColor);
-                }                
-                cout << "Function: BuildStructure, Message: The brick type is 1x1." << endl;
+                }
+                else{
+                    OneByOneBlockDispenser.front().setColor(it->Color());
+                }
 
-                OneByOneBlockDispenser = pickUpBrick_and_Move(rdk, robot, table_frame, work_frame, tool, OneByOneBlockDispenser, temp1x1);
+                cout << "Function: Run_Build, Message: The brick type is 1x1." << endl;
+
+                OneByOneBlockDispenser = Build_And_Update_Dispenser(rdk, robot, table_frame, work_frame, tool, OneByOneBlockDispenser, temp1x1);
             }
         }
         if(it->Priority() == 0) notPlaceAbleCounter++;
@@ -545,17 +602,17 @@ void MainWindow::BuildStructure(){
     }    
     duration = ( clock() - start ) / (double) CLOCKS_PER_SEC;
 
-    cout<<"Function: BuildStructure, Message: duration of build was "<< duration << endl;
+    cout<<"Function: Run_Build, Message: duration of build was "<< duration << endl;
 }
 
 /**
- * @brief MainWindow::pickUpBrick_and_Move
+ * @brief MainWindow::Build_And_Update_Dispenser
  *
  * This function simulates the process of the robot moving to a dispenser to pick out a brick,
  * moving over to the base plate or structure, and placing the brick on the correct spot.
  *
  * To simulate the dispensers when a brick is dragged out of the stack, the function
- * UpdateDispenser is called and ran concurrently when the robot has picked out a brick.
+ * Update_Dispenser is called and ran concurrently when the robot has picked out a brick.
  *
  * @param rdk is the RoboDK instance.
  * @param robot is the active robot.
@@ -568,7 +625,7 @@ void MainWindow::BuildStructure(){
  * @param brick is the current brick.
  * @return
  */
-list<Item> MainWindow::pickUpBrick_and_Move(RoboDK *rdk, Item *robot, Item *parent_frame, Item *work_frame, Item *tool, list<Item> dispenser, DuploBrick *brick){
+list<Item> MainWindow::Build_And_Update_Dispenser(RoboDK *rdk, Item *robot, Item *parent_frame, Item *work_frame, Item *tool, list<Item> dispenser, DuploBrick *brick){
     //This is for One stud = One coord
     //int xPlace = 624;
 
@@ -581,7 +638,7 @@ list<Item> MainWindow::pickUpBrick_and_Move(RoboDK *rdk, Item *robot, Item *pare
 
     //Get Brick
     int dispSize = dispenser.size();
-    cout << "Function: pickUpBrick_and_Move, Message: Size of current dispenser is " << dispSize << endl;
+    cout << "Function: Build_And_Update_Dispenser_List, Message: Size of current dispenser is " << dispSize << endl;
 
     //For placing the bricks correctly on the studs. Measurement is in mm.
     double studX = 8.9;
@@ -606,7 +663,7 @@ list<Item> MainWindow::pickUpBrick_and_Move(RoboDK *rdk, Item *robot, Item *pare
 
     //parent_frame->Pose().rotate(rotation, 1.0, 0.0, 0.0);
 
-    simulateDispenser = QtConcurrent::run(this, &MainWindow::UpdateDispenser, dispenser, brick->Name());
+    simulateDispenser = QtConcurrent::run(this, &MainWindow::Update_Dispenser, dispenser, brick);
 
     work_frame->setParent(*parent_frame);
     work_frame->setPose(transl(0, 0, 0));
@@ -615,7 +672,7 @@ list<Item> MainWindow::pickUpBrick_and_Move(RoboDK *rdk, Item *robot, Item *pare
 
     Mat pose_ref = robot->Pose();
     pose_ref.rotate(brick->Rotation(), 0, 0, 1.0);
-    cout << "Function: pickUpBrick_and_Move, Message: Rotation of brick is: " << brick->Rotation() << endl;
+    cout << "Function: Build_And_Update_Dispenser_List, Message: Rotation of brick is: " << brick->Rotation() << endl;
     robot->MoveL(pose_ref);
 
     pose_ref.setPos(baseX + studX, baseY - studY, -31.1 - layerPlacement);
@@ -627,27 +684,34 @@ list<Item> MainWindow::pickUpBrick_and_Move(RoboDK *rdk, Item *robot, Item *pare
     if(!simulateDispenser.isFinished()){
         simulateDispenser.waitForFinished();
     }
+    //double color[4] = {brick->R(), brick->G(), brick->B(), brick->A()};
+    //dispenser = Fill_Dispenser(brick, color, 1);
 
     return dispenser;
 }
 
 /**
- * @brief MainWindow::UpdateDispenser
+ * @brief MainWindow::Update_Dispenser
  *
  * Simulates the scenario where a brick is dragged out from the bottom of a stack of bricks.
  *
  * @param dispenser is the dispenser
  * @param brickName is the name of the brick
  */
-void MainWindow::UpdateDispenser(list<Item> dispenser, QString brickName){
+void MainWindow::Update_Dispenser(list<Item> dispenser, DuploBrick *brick){
     if(!dispenser.empty()){
         list<Item>::iterator it;
         int counter = 0;
         for (it = dispenser.begin(); it != dispenser.end(); it++){
-            if(brickName == "duplo_brick_2x2" || brickName == "duplo_brick_1x1"){
+            if(brick->Name() == "duplo_brick_1x1"){
+                Mat pose_box = it->Pose();
+                pose_box.setPos(-14, counter*32 - 16, 0);
+                it->setPose(pose_box);
+            }
+            else if(brick->Name() == "duplo_brick_2x2"){
                 Mat pose_box = it->Pose();
                 pose_box.setPos(0, counter*32 + 1, 0);
-                it->setPose(pose_box);
+                it->setPose(pose_box); 
             }
             else{
                 Mat pose_box = it->Pose();
@@ -660,7 +724,7 @@ void MainWindow::UpdateDispenser(list<Item> dispenser, QString brickName){
 }
 
 /**
- * @brief MainWindow::checkIfdispenserIsEmpty
+ * @brief MainWindow::Check_If_Dispenser_Is_Empty
  *
  * Checks if either of the dispensers are empty. Returns true if either of the
  * dispensers are empty and stops the robot if it is active.
@@ -668,7 +732,7 @@ void MainWindow::UpdateDispenser(list<Item> dispenser, QString brickName){
  * @param robot is the active robot.
  * @return
  */
-bool MainWindow::checkIfdispenserIsEmpty(Item *robot){
+bool MainWindow::Check_If_Dispenser_Is_Empty(Item *robot){
     bool TwoByTwoListEmpty = TwoByTwoBlockDispenser.empty();
     bool TwoByFourListEmpty = TwoByFourBlockDispenser.empty();
     bool OneByOneListEmpty = OneByOneBlockDispenser.empty();
@@ -676,23 +740,23 @@ bool MainWindow::checkIfdispenserIsEmpty(Item *robot){
     if(TwoByTwoListEmpty){
         robot->Stop();
         ui->statusBar->showMessage("Please fill up 2x2 dispenser.");
-        cout << "Function: checkIfdispenserIsEmpty, Message: Please fill up 2x2 dispenser." << endl;
+        cout << "Function: Check_If_Dispenser_Is_Empty, Message: Please fill up 2x2 dispenser." << endl;
     }
     else if(TwoByFourListEmpty){
         robot->Stop();
         ui->statusBar->showMessage("Please fill up 2x4 dispenser.");
-        cout << "Function: checkIfdispenserIsEmpty, Message: Please fill up 2x4 dispenser." << endl;
+        cout << "Function: Check_If_Dispenser_Is_Empty, Message: Please fill up 2x4 dispenser." << endl;
     }
     else if(OneByOneListEmpty){
         robot->Stop();
         ui->statusBar->showMessage("Please fill up 1x1 dispenser.");
-        cout << "Function: checkIfdispenserIsEmpty, Message: Please fill up 1x1 dispenser." << endl;
+        cout << "Function: Check_If_Dispenser_Is_Empty, Message: Please fill up 1x1 dispenser." << endl;
     }
     return TwoByTwoListEmpty || TwoByFourListEmpty || OneByOneListEmpty;
 }
 
 /**
- * @brief MainWindow::CheckIfPlaceable
+ * @brief MainWindow::Check_If_Placeable
  *
  * Function that checks if a brick is placeable. This is done by counting coordinates that are true
  * in the 3 dimensional array. A true value tells us that a brick is to be placed here. The
@@ -707,7 +771,7 @@ bool MainWindow::checkIfdispenserIsEmpty(Item *robot){
  * @param z is the z coordinate.
  * @return
  */
-int MainWindow::CheckIfPlaceable(int studsXdir, int studsYdir, bool arr[50][50][50], int x, int y, int z){
+int MainWindow::Check_If_Placeable(int studsXdir, int studsYdir, bool arr[50][50][50], int x, int y, int z){
     int xCounter = 0;
     int studCounter = 0;
 
@@ -736,7 +800,6 @@ void MainWindow::on_btnAddLayer_clicked(){
 
     for (it = radBtnList.begin(); it != radBtnList.end(); it++){
         if(it->rbtn->isChecked()){
-            //supportCoords[z][it->xID][it->yID] = true;
             buildCoords[z][it->xID][it->yID] = true;
             it->rbtn->setChecked(false);
         }
@@ -755,21 +818,29 @@ void MainWindow::on_btnAddLayer_clicked(){
 /**
  * @brief MainWindow::on_load3DModelbtn_clicked
  *
- * Function that reads a text file to set up the coordinate array. The txt file
- * contains coordinates of voxels of a 3D model that has been voxelized.
+ * Function that reads a text file to set up the coordinate array and the color assigned to each coordinate. The txt file
+ * contains coordinates of voxels of a 3D model that has been voxelized. First 3 values of each line defines the coords
+ * while the last 3 values of each line defines the color.
+ *
+ * Example of what this txt file look like:
+ * 3, 2, 0, 255, 255, 0
+ * 4, 2, 0, 255, 254, 0
+ * 5, 2, 0, 202, 0, 0
+ * 6, 2, 0, 204, 0, 0
  *
  */
 void MainWindow::on_load3DModelbtn_clicked(){
     int bricks = 0;
     z = 0;
 
-    string readX, readY, readZ;
+    string readX, readY, readZ, readR, readG, readB;
     int xCoord, yCoord, zCoord;
+    double colorR, colorG, colorB;
 
     if(bricklist.empty()){
         notPlaceAbleCounter = 0;
 
-        ifstream fileStream("E:/Users/kimandre/Documents/3dVoxelModels/_3DBenchy.txt");
+        ifstream fileStream("E:/Users/kimandre/Documents/3dVoxelModels/13517_beach_ball_v2_l3_Colorized_fullThickness.txt");
 
         if(!fileStream.is_open()){
             cout<<"Function: on_load3DModelbtn_clicked, Message: Error when opening file"<<endl;
@@ -787,6 +858,19 @@ void MainWindow::on_load3DModelbtn_clicked(){
 
                 getline(ss, readZ, ',');
                 zCoord = stoi(readZ);
+
+                getline(ss, readR, ',');
+                colorR = stod(readR) / 255.0;
+
+                getline(ss, readG, ',');
+                colorG = stod(readG) / 255.0;
+
+                getline(ss, readB, ',');
+                colorB = stod(readB) / 255.0;
+
+                CoordColor *colorAtCoords = new CoordColor(yCoord, xCoord, zCoord, colorR, colorG, colorB);
+
+                colorList.push_back(*colorAtCoords);
 
                 if(yCoord > z){
                     cout << "Function: on_load3DModelbtn_clicked, Message: Current Layer: " << z << endl;
@@ -831,9 +915,8 @@ void MainWindow::on_resetLayerbtn_clicked(){
  *
  */
 void MainWindow::on_fill4x2feederbtn_clicked(){
-    double colorBlue[4] = {0.9, 0.9, 0.0, 1.0};
-    Brick2x4 *temp = new Brick2x4(0, 0, 0, false);
-    if(TwoByFourBlockDispenser.empty()){ TwoByFourBlockDispenser = fillDispenser(temp, colorBlue); }
+    Brick2x4 *temp = new Brick2x4(0, 0, 0);
+    if(TwoByFourBlockDispenser.empty()){ TwoByFourBlockDispenser = Fill_Dispenser(temp, temp->Color(), 14); }
 }
 
 /**
@@ -843,9 +926,8 @@ void MainWindow::on_fill4x2feederbtn_clicked(){
  *
  */
 void MainWindow::on_fill2x2feederbtn_clicked(){
-    double colorRed[4] = {0.0, 0.9, 0.9, 1.0};
-    Brick2x2 *temp = new Brick2x2(0, 0, 0, false);
-    if(TwoByTwoBlockDispenser.empty()){ TwoByTwoBlockDispenser = fillDispenser(temp, colorRed); }
+    Brick2x2 *temp = new Brick2x2(0, 0, 0);
+    if(TwoByTwoBlockDispenser.empty()){ TwoByTwoBlockDispenser = Fill_Dispenser(temp, temp->Color(), 14); }
 }
 
 /**
@@ -855,13 +937,12 @@ void MainWindow::on_fill2x2feederbtn_clicked(){
  *
  */
 void MainWindow::on_fill1x1feederbtn_clicked(){
-    double colorWhite[4] = {0.9, 0.9, 0.9, 1.0};
-    Brick1x1 *temp = new Brick1x1(0, 0, 0, false);
-    if(OneByOneBlockDispenser.empty()){ OneByOneBlockDispenser = fillDispenser(temp, colorWhite); }
+    Brick1x1 *temp = new Brick1x1(0, 0, 0);
+    if(OneByOneBlockDispenser.empty()){ OneByOneBlockDispenser = Fill_Dispenser(temp, temp->Color(), 14); }
 }
 
 /**
- * @brief MainWindow::fillDispenser
+ * @brief MainWindow::Fill_Dispenser
  *
  * Function that fills a brick dispenser up when empty.
  *
@@ -869,15 +950,22 @@ void MainWindow::on_fill1x1feederbtn_clicked(){
  * @param RGB is the color of the brick.
  * @return
  */
-list<Item> MainWindow::fillDispenser(DuploBrick *brick, double RGB[4]){
+list<Item> MainWindow::Fill_Dispenser(DuploBrick *brick, double RGB[4], int missingBricks){
     list<Item> dispenserList;
 
-    for(int i = 0; i < 14; i++){
+    for(int i = 14 - missingBricks; i < 14; i++){
         Item *dispenser_frame = new Item(RDK->getItem(brick->DispenserName(), RoboDK::ITEM_TYPE_FRAME));
         RDK->AddFile(brick->FileLocation(), dispenser_frame);
         Item *box = new Item(RDK->getItem(brick->Name(), RoboDK::ITEM_TYPE_OBJECT));
         box->setColor(RGB);
-        if(brick->Name() == "duplo_brick_2x2" || brick->Name() == "duplo_brick_1x1"){
+        if(brick->Name() == "duplo_brick_1x1"){
+            Mat pose_box = box->Pose();
+            pose_box.setPos(-14, i*32 - 16, 0);
+            pose_box.rotate(-180, 1.0, 0, 0);
+            box->setPose(pose_box);
+
+        }
+        else if(brick->Name() == "duplo_brick_2x2"){
             Mat pose_box = box->Pose();
             pose_box.setPos(0, i*32 + 1, 0);
             pose_box.rotate(-180, 1.0, 0, 0);
@@ -917,7 +1005,7 @@ void  MainWindow::on_dropBrickbtn_clicked(){
         simulateDispenser.waitForFinished();
     }
     else if(!TwoByTwoBlockDispenser.empty() || !TwoByFourBlockDispenser.empty()){
-        mainThread = new std::thread(&MainWindow::BuildStructure, this);
+        mainThread = new std::thread(&MainWindow::Run_Build, this);
     }
 }
 
@@ -928,7 +1016,7 @@ void  MainWindow::on_dropBrickbtn_clicked(){
  *
  */
 void MainWindow::on_humanInterferencebtn_clicked(){
-     std::thread *insertArmThread = new std::thread(&MainWindow::EmergencyTriggered, this);
+     std::thread *insertArmThread = new std::thread(&MainWindow::Emergency_Triggered, this);
      insertArmThread->join();
 }
 
@@ -965,7 +1053,7 @@ void MainWindow::on_emergencyStopbtn_clicked(){
 }
 
 /**
- * @brief MainWindow::EmergencyTriggered
+ * @brief MainWindow::Emergency_Triggered
  *
  * Function that simulates the scenario where a person sticks their arm into the robot's
  * workspace. In a real life situation a emergency stop will trigger when this happens
@@ -974,7 +1062,7 @@ void MainWindow::on_emergencyStopbtn_clicked(){
  * Note: Stopping the thread may cause unwanted behavior in the simulation.
  *
  */
-void MainWindow::EmergencyTriggered(){
+void MainWindow::Emergency_Triggered(){
     RoboDK *rdk = new RoboDK;
     Item *frame = new Item(rdk->getItem("Person", RoboDK::ITEM_TYPE_FRAME));
     rdk->AddFile("C:/RoboDK/Library/11535_arm_V3_.obj", frame);
